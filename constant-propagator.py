@@ -47,11 +47,11 @@ class ConstantReductionVisitor(ASTVisitor):
         ident = node.node
         if self.debug:
             print self.indent * ' ' + type_name(ident)
-        assert type_name(ident) == 'Identifier'
 
-        if ident.value in self.const_arrs and is_const(node.expr):
-            if node.expr.value in self.const_arrs[ident.value]:
-                return self.const_arrs[ident.value][node.expr.value]
+        if type_name(ident) == 'Identifier':
+            if ident.value in self.const_arrs and is_const(node.expr):
+                if node.expr.value in self.const_arrs[ident.value]:
+                    return self.const_arrs[ident.value][node.expr.value]
         return node
 
     def visit_vardecl(self, node):
