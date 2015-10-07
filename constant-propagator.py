@@ -105,6 +105,8 @@ class ConstantReductionVisitor(ASTVisitor):
             if ident.value in self.const_arrs and is_const(node.expr):
                 if node.expr.value in self.const_arrs[ident.value]:
                     return self.const_arrs[ident.value][node.expr.value]
+        else:
+            node.node = self.visit(node.node)
 
         return node
 
@@ -196,6 +198,8 @@ class ConstantReductionVisitor(ASTVisitor):
         node.left = self.visit(node.left)
         node.right = self.visit(node.right)
 
+        # TODO: Check if all ops work the same way as JS
+        # TODO: Check the integer to double conversions
         if is_const(node.left) and is_const(node.right):
             op = node.op
             left = int(node.left.value)
@@ -208,6 +212,14 @@ class ConstantReductionVisitor(ASTVisitor):
                 node = ast.Number(str(left / right))
             elif op == '*':
                 node = ast.Number(str(left * right))
+            elif op == '&':
+                node = ast.Number(str(left & right))
+            elif op == '>>':
+                node = ast.Number(str(left >> right))
+            elif op == '<<':
+                node = ast.Number(str(left << right))
+            elif op == '>>>':
+                node = ast.Number(str(left >> right))
 
         return node
 
