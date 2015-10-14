@@ -70,9 +70,12 @@ class ConstantReductionVisitor(ASTVisitor):
     def visit_return(self, node):
         return self.visit_attrs(node, 'expr')
 
-    def visit_identifier(self, node):
+    def visit_identifier(self, node, modifying):
         if node.value in self.const_vars:
-            return self.const_vars[node.value]
+            if modifying:
+                del self.const_vars[node.value]
+            else:
+                return self.const_vars[node.value]
 
         return node
 
@@ -95,7 +98,7 @@ class ConstantReductionVisitor(ASTVisitor):
     def visit_block(self, node):
         return self.visit_node(node)
 
-    def visit_bracketaccessor(self, node):
+    def visit_bracketaccessor(self, node, modifying):
         ident = node.node
         if self.debug:
             print_indented(self.indent + 1, ident)
@@ -104,7 +107,10 @@ class ConstantReductionVisitor(ASTVisitor):
         if type_name(ident) == 'Identifier':
             if ident.value in self.const_arrs and is_const(node.expr):
                 if node.expr.value in self.const_arrs[ident.value]:
-                    return self.const_arrs[ident.value][node.expr.value]
+                    if modifying:
+                        del self.const_arrs[ident.value][node.expr.value]
+                    else:
+                        return self.const_arrs[ident.value][node.expr.value]
         else:
             node.node = self.visit(node.node)
 
@@ -192,7 +198,11 @@ class ConstantReductionVisitor(ASTVisitor):
         return self.visit_node(node)
 
     def visit_unaryop(self, node):
-        return self.visit_attrs(node, 'op', 'value', 'postfix')
+        if node.op in ['++', '--']:
+            node.value = self.visit(node.value, True)
+            return node
+        else:
+            return self.visit_attrs(node, 'op', 'value', 'postfix')
 
     def visit_binop(self, node):
         node.left = self.visit(node.left)
@@ -250,17 +260,28 @@ class ConstantReductionVisitor(ASTVisitor):
     def visit_null(self, node):
         return node
 
-    def visit(self, root):
+    def visit_boolean(self, node):
+        return node
+
+    def visit(self, root, modifying=False):
         if root is None:
             return None
 
+        lvalue = False
+        tn = type_name(root).lower()
+        if tn in ['identifier', 'bracketaccessor']:
+            lvalue = True
+
         self.indent += 1
-        func = getattr(self, "visit_%s" % type_name(root).lower(), None)
+        func = getattr(self, 'visit_%s' % tn, None)
         if func is None:
             raise Exception('No visitor method defined for type ' + type_name(root))
         if self.debug:
             print_indented(self.indent, root)
-        ret_val = func(root)
+        if lvalue:
+            ret_val = func(root, modifying)
+        else:
+            ret_val = func(root)
         self.indent -= 1
         return ret_val
 
