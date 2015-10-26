@@ -25,7 +25,7 @@ class ConstantReductionVisitor(ASTVisitor):
     const_arrs = {}
     indent = 0
 
-    def __init__(self, debug):
+    def __init__(self, debug=False):
         self.debug = debug
 
     def visit_attrs(self, node, *attrs):
@@ -125,7 +125,7 @@ class ConstantReductionVisitor(ASTVisitor):
     def visit_case(self, node):
         return self.visit_attrs(node, 'expr', 'elements')
 
-    def visit_defaults(self, node):
+    def visit_default(self, node):
         return self.visit_attrs(node, 'elements')
 
     def visit_label(self, node):
