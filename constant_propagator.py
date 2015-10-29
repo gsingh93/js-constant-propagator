@@ -87,7 +87,26 @@ class ConstantReductionVisitor(ASTVisitor):
         return node
 
     def visit_assign(self, node):
-        return self.visit_attrs(node, 'op', 'left', 'right')
+        node.left = self.visit(node.left, True)
+        tname = type_name(node.left)
+        assert tname in ['Identifier', 'BracketAccessor'] #TODO: Property
+        node.right = self.visit(node.right)
+        if tname == 'Identifier':
+            ident = node.left
+            if is_const(node.right):
+                self.const_vars[ident.value] = node.right
+            elif node.left.value in self.const_vars:
+                del self.const_vars[ident.value]
+        else:
+            assert tname == 'BracketAccessor'
+            ident = node.left.node
+            index = node.left.expr
+            if is_const(node.right):
+                self.const_arrs[ident.value][index.value] = node.right
+            elif index.value in self.const_arrs[ident.value]:
+                del self.const_arrs[ident.value][index.value]
+
+        return node
 
     def visit_object(self, node):
         return self.visit_attrs(node, 'properties')
@@ -182,7 +201,7 @@ class ConstantReductionVisitor(ASTVisitor):
             if is_const(init):
                 self.const_vars[ident.value] = init
             elif ident.value in self.const_vars:
-                del const_vars[ident.value]
+                del self.const_vars[ident.value] # TODO: WTF, this wasn't tested
         else:
             d = {}
             i = 0

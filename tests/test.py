@@ -2,9 +2,13 @@ import nose
 from slimit.parser import Parser
 from constant_propagator import ConstantReductionVisitor
 
+
 files = [
     'nested_array_index',
+    'constant_variables',
+    'constant_array',
 ]
+
 
 def check_expected_output(filename):
     input_file = 'js/%s.js' % filename
