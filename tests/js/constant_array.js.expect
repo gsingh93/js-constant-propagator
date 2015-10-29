@@ -7,3 +7,5 @@ b = a[1];
 b = a;
 c = b[1];
 d = "const";
+b[0] = 2;
+console.log(2);

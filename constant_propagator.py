@@ -93,6 +93,10 @@ class ConstantReductionVisitor(ASTVisitor):
         node.right = self.visit(node.right)
         if tname == 'Identifier':
             ident = node.left
+            if type_name(node.right) == 'Identifier':
+                if node.right.value in self.const_arrs:
+                    d = self.const_arrs[node.right.value]
+                    self.const_arrs[ident.value] = d
             if is_const(node.right):
                 self.const_vars[ident.value] = node.right
             elif node.left.value in self.const_vars:
