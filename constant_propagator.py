@@ -8,16 +8,28 @@ from slimit.visitors.nodevisitor import ASTVisitor
 from slimit import ast
 
 
+class JsType:
+    NUMBER = 'Number'
+    STRING = 'String'
+    BOOL = 'Boolean'
+    NULL = 'Null'
+    UNDEFINED = 'Undefined' # TODO: Doesn't exist in slimit
+
+    PRIMITIVES = [NUMBER, STRING, BOOL, NULL, UNDEFINED]
+
+
+class NodeType:
+    IDENTIFIER = 'Identifier'
+    BRACKET_ACCESSOR = 'BracketAccessor'
+    ARRAY = 'Array'
+
+
+ast.Node.name = lambda self: type(self).__name__
+ast.Node.is_const = lambda self: self.name() in JsType.PRIMITIVES
+
+
 def print_indented(indent, node):
-    print indent * ' ' + type_name(node)
-
-
-def type_name(root):
-    return type(root).__name__
-
-
-def is_const(node):
-    return type_name(node) == 'Number' or type_name(node) == 'String'
+    print indent * ' ' + node.name()
 
 
 class ConstantReductionVisitor(ASTVisitor):
@@ -35,7 +47,7 @@ class ConstantReductionVisitor(ASTVisitor):
         for attr_name in attrs:
             if not hasattr(node, attr_name):
                 raise Exception("Property %s doesn't exist on node type %s"
-                                % (attr_name, type_name(node)))
+                                % (attr_name, node.name()))
             attr = getattr(node, attr_name, None)
             if isinstance(attr, list):
                 for i in range(len(attr)):
@@ -88,24 +100,24 @@ class ConstantReductionVisitor(ASTVisitor):
 
     def visit_assign(self, node):
         node.left = self.visit(node.left, True)
-        tname = type_name(node.left)
-        assert tname in ['Identifier', 'BracketAccessor'] #TODO: Property
+        tname = node.left.name()
+        assert tname in [NodeType.IDENTIFIER, NodeType.BRACKET_ACCESSOR] #TODO: Property
         node.right = self.visit(node.right)
-        if tname == 'Identifier':
+        if tname == NodeType.IDENTIFIER:
             ident = node.left
-            if type_name(node.right) == 'Identifier':
+            if node.right.name() == NodeType.IDENTIFIER:
                 if node.right.value in self.const_arrs:
                     d = self.const_arrs[node.right.value]
                     self.const_arrs[ident.value] = d
-            if is_const(node.right):
+            if node.right.is_const():
                 self.const_vars[ident.value] = node.right
             elif node.left.value in self.const_vars:
                 del self.const_vars[ident.value]
         else:
-            assert tname == 'BracketAccessor'
+            assert tname == NodeType.BRACKET_ACCESSOR
             ident = node.left.node
             index = node.left.expr
-            if is_const(node.right):
+            if node.right.is_const():
                 self.const_arrs[ident.value][index.value] = node.right
             elif index.value in self.const_arrs[ident.value]:
                 del self.const_arrs[ident.value][index.value]
@@ -127,8 +139,8 @@ class ConstantReductionVisitor(ASTVisitor):
             print_indented(self.indent + 1, ident)
         node.expr = self.visit(node.expr)
 
-        if type_name(ident) == 'Identifier':
-            if ident.value in self.const_arrs and is_const(node.expr):
+        if ident.name() == NodeType.IDENTIFIER:
+            if ident.value in self.const_arrs and node.expr.is_const():
                 if node.expr.value in self.const_arrs[ident.value]:
                     if modifying:
                         del self.const_arrs[ident.value][node.expr.value]
@@ -196,13 +208,13 @@ class ConstantReductionVisitor(ASTVisitor):
         ident = node.identifier
         if self.debug:
             print_indented(self.indent + 1, ident)
-        assert type_name(ident) == "Identifier"
+        assert ident.name() == NodeType.IDENTIFIER
 
         node.initializer = self.visit(node.initializer)
         init = node.initializer
 
-        if type_name(init) != 'Array':
-            if is_const(init):
+        if init.name() != NodeType.ARRAY:
+            if init.is_const():
                 self.const_vars[ident.value] = init
             elif ident.value in self.const_vars:
                 del self.const_vars[ident.value] # TODO: WTF, this wasn't tested
@@ -210,7 +222,7 @@ class ConstantReductionVisitor(ASTVisitor):
             d = {}
             i = 0
             for child in init.children():
-                if is_const(child):
+                if child.is_const():
                     d[str(i)] = child
                 i += 1
             self.const_arrs[ident.value] = d
@@ -233,7 +245,7 @@ class ConstantReductionVisitor(ASTVisitor):
 
         # TODO: Check if all ops work the same way as JS
         # TODO: Check the integer to double conversions
-        if is_const(node.left) and is_const(node.right):
+        if node.left.is_const() and node.right.is_const():
             op = node.op
             left = int(node.left.value)
             right = int(node.right.value)
@@ -291,14 +303,16 @@ class ConstantReductionVisitor(ASTVisitor):
             return None
 
         lvalue = False
-        tn = type_name(root).lower()
-        if tn in ['identifier', 'bracketaccessor']:
+        tn = root.name()
+        if tn in [NodeType.IDENTIFIER, NodeType.BRACKET_ACCESSOR]:
             lvalue = True
+
+        tn = tn.lower()
 
         self.indent += 1
         func = getattr(self, 'visit_%s' % tn, None)
         if func is None:
-            raise Exception('No visitor method defined for type ' + type_name(root))
+            raise Exception('No visitor method defined for type ' + root.name())
         if self.debug:
             print_indented(self.indent, root)
         if lvalue:
